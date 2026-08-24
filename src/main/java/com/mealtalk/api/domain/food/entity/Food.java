@@ -23,4 +23,32 @@ public class Food extends BaseEntity {
     @Column(name = "external_source", length = 50) private String externalSource;
     @Column(name = "external_food_id", length = 200) private String externalFoodId;
     @Column(name = "last_fetched_at") private LocalDate lastFetchedAt;
+
+    public static Food create(
+        String name,
+        String normalizedName,
+        BigDecimal servingAmount,
+        String servingUnit,
+        BigDecimal caloriesKcal,
+        BigDecimal carbohydratesG,
+        BigDecimal proteinG,
+        BigDecimal fatG,
+        String externalSource,
+        String externalFoodId,
+        LocalDate lastFetchedAt
+    ) {
+        Food food = new Food();
+        food.name = name;
+        food.normalizedName = normalizedName;
+        food.servingAmount = servingAmount;
+        food.servingUnit = servingUnit;
+        food.caloriesKcal = caloriesKcal;
+        food.carbohydratesG = carbohydratesG;
+        food.proteinG = proteinG;
+        food.fatG = fatG;
+        food.externalSource = externalSource;
+        food.externalFoodId = externalFoodId;
+        food.lastFetchedAt = lastFetchedAt;
+        return food;
+    }
 }

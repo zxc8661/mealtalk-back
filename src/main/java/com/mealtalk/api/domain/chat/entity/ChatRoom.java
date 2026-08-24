@@ -10,4 +10,10 @@ import lombok.NoArgsConstructor;
 @Getter @Entity @Table(name = "chat_rooms") @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatRoom extends BaseEntity {
     @OneToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false, unique = true) private User user;
+
+    public static ChatRoom create(User user) {
+        ChatRoom room = new ChatRoom();
+        room.user = user;
+        return room;
+    }
 }

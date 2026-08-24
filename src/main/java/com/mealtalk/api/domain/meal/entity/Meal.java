@@ -16,4 +16,14 @@ public class Meal extends BaseEntity {
     @Enumerated(EnumType.STRING) @Column(name = "meal_type", nullable = false, length = 20) private MealType mealType;
     @Column(name = "eaten_at") private Instant eatenAt;
     @Column(name = "source_text", columnDefinition = "TEXT") private String sourceText;
+
+    public static Meal create(User user, LocalDate mealDate, MealType mealType, Instant eatenAt, String sourceText) {
+        Meal meal = new Meal();
+        meal.user = user;
+        meal.mealDate = mealDate;
+        meal.mealType = mealType;
+        meal.eatenAt = eatenAt;
+        meal.sourceText = sourceText;
+        return meal;
+    }
 }

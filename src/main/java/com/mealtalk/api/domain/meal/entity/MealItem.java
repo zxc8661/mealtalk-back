@@ -18,4 +18,26 @@ public class MealItem extends BaseEntity {
     @Column(name = "carbohydrates_g", nullable = false, precision = 10, scale = 3) private BigDecimal carbohydratesG;
     @Column(name = "protein_g", nullable = false, precision = 10, scale = 3) private BigDecimal proteinG;
     @Column(name = "fat_g", nullable = false, precision = 10, scale = 3) private BigDecimal fatG;
+
+    public static MealItem create(
+        Meal meal,
+        Food food,
+        BigDecimal amount,
+        String unit,
+        BigDecimal caloriesKcal,
+        BigDecimal carbohydratesG,
+        BigDecimal proteinG,
+        BigDecimal fatG
+    ) {
+        MealItem item = new MealItem();
+        item.meal = meal;
+        item.food = food;
+        item.amount = amount;
+        item.unit = unit;
+        item.caloriesKcal = caloriesKcal;
+        item.carbohydratesG = carbohydratesG;
+        item.proteinG = proteinG;
+        item.fatG = fatG;
+        return item;
+    }
 }

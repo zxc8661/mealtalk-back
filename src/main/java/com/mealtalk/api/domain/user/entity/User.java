@@ -23,4 +23,19 @@ public class User extends BaseEntity {
     @Column(length = 100) private String name;
     @Column(name = "profile_completed", nullable = false) private boolean profileCompleted;
     @Column(nullable = false, length = 50) private String timezone = "Asia/Seoul";
+
+    public static User create(AuthProvider provider, String providerUserId, String email, String name, String timezone) {
+        User user = new User();
+        user.provider = provider;
+        user.providerUserId = providerUserId;
+        user.email = email;
+        user.name = name;
+        user.profileCompleted = false;
+        user.timezone = timezone;
+        return user;
+    }
+
+    public void completeProfile() {
+        profileCompleted = true;
+    }
 }

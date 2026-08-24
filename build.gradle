@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.1.0'
+	id 'org.springframework.boot' version '3.5.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -21,19 +21,45 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'com.h2database:h2'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+def asciiTestRuntimeDir = providers.provider {
+	file("${System.getProperty('java.io.tmpdir')}/mealtalk-api-test-runtime")
+}
+
+def syncAsciiTestRuntime = tasks.register('syncAsciiTestRuntime', Sync) {
+	from(sourceSets.main.output) {
+		into 'main'
+	}
+	from(sourceSets.test.output) {
+		into 'test'
+	}
+	into asciiTestRuntimeDir
+}
+
+tasks.named('test', Test) {
+	useJUnitPlatform {
+		includeEngines 'junit-jupiter'
+	}
+	dependsOn syncAsciiTestRuntime
+	doFirst {
+		def runtimeDir = asciiTestRuntimeDir.get()
+		def mainOutput = files(sourceSets.main.output.classesDirs, sourceSets.main.output.resourcesDir)
+		def testOutput = files(sourceSets.test.output.classesDirs, sourceSets.test.output.resourcesDir)
+		testClassesDirs = files(new File(runtimeDir, 'test'))
+		classpath = files(new File(runtimeDir, 'test'), new File(runtimeDir, 'main')) +
+			(sourceSets.test.runtimeClasspath - mainOutput - testOutput)
+	}
 }

@@ -16,4 +16,14 @@ public class UserProfile extends BaseEntity {
     @Column(name = "weight_kg", nullable = false, precision = 5, scale = 2) private BigDecimal weightKg;
     @Enumerated(EnumType.STRING) @Column(name = "activity_level", nullable = false, length = 20) private ActivityLevel activityLevel;
     @Enumerated(EnumType.STRING) @Column(name = "goal_mode", nullable = false, length = 20) private GoalMode goalMode;
+
+    public static UserProfile create(User user, BigDecimal heightCm, BigDecimal weightKg, ActivityLevel activityLevel, GoalMode goalMode) {
+        UserProfile profile = new UserProfile();
+        profile.user = user;
+        profile.heightCm = heightCm;
+        profile.weightKg = weightKg;
+        profile.activityLevel = activityLevel;
+        profile.goalMode = goalMode;
+        return profile;
+    }
 }
