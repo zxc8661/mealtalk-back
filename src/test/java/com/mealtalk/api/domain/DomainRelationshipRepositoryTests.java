@@ -1,11 +1,5 @@
 package com.mealtalk.api.domain;
 
-import com.mealtalk.api.domain.chat.entity.ChatMessage;
-import com.mealtalk.api.domain.chat.entity.ChatRole;
-import com.mealtalk.api.domain.chat.entity.ChatRoom;
-import com.mealtalk.api.domain.chat.entity.MessageStatus;
-import com.mealtalk.api.domain.chat.repository.ChatMessageRepository;
-import com.mealtalk.api.domain.chat.repository.ChatRoomRepository;
 import com.mealtalk.api.domain.food.entity.Food;
 import com.mealtalk.api.domain.food.repository.FoodRepository;
 import com.mealtalk.api.domain.meal.entity.Meal;
@@ -31,7 +25,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,8 +34,6 @@ public class DomainRelationshipRepositoryTests {
     @Autowired private UserRepository userRepository;
     @Autowired private UserProfileRepository userProfileRepository;
     @Autowired private UserTargetRepository userTargetRepository;
-    @Autowired private ChatRoomRepository chatRoomRepository;
-    @Autowired private ChatMessageRepository chatMessageRepository;
     @Autowired private FoodRepository foodRepository;
     @Autowired private MealRepository mealRepository;
     @Autowired private MealItemRepository mealItemRepository;
@@ -70,16 +61,6 @@ public class DomainRelationshipRepositoryTests {
             TargetType.DAILY_PROTEIN,
             BigDecimal.valueOf(150),
             LocalDate.now().plusMonths(3)
-        ));
-
-        ChatRoom room = chatRoomRepository.save(ChatRoom.create(user));
-        chatMessageRepository.save(ChatMessage.create(
-            room,
-            ChatRole.USER,
-            "점심에 닭가슴살 200g이랑 밥 180g 먹었어",
-            "ADD_MEAL",
-            Map.of("meal_type", "LUNCH"),
-            MessageStatus.COMPLETED
         ));
 
         Food chicken = foodRepository.save(Food.create(
@@ -117,8 +98,6 @@ public class DomainRelationshipRepositoryTests {
         assertTrue(userRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, "google-user-1").isPresent());
         assertTrue(userProfileRepository.findByUserId(user.getId()).isPresent());
         assertEquals(1, userTargetRepository.findAllByUserId(user.getId()).size());
-        assertTrue(chatRoomRepository.findByUserId(user.getId()).isPresent());
-        assertEquals(1, chatMessageRepository.findAllByRoomIdOrderByCreatedAtAsc(room.getId()).size());
         assertTrue(foodRepository.findByExternalSourceAndExternalFoodId("fixture", "chicken-breast").isPresent());
 
         List<Meal> meals = mealRepository.findAllByUserIdAndMealDateOrderByEatenAtAscCreatedAtAsc(user.getId(), mealDate);

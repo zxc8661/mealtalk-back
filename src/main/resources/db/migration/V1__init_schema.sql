@@ -39,30 +39,6 @@ CREATE TABLE user_targets (
     CONSTRAINT ck_user_targets_value_positive CHECK (target_value > 0)
 );
 
-CREATE TABLE chat_rooms (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uk_chat_rooms_user UNIQUE (user_id),
-    CONSTRAINT fk_chat_rooms_user FOREIGN KEY (user_id) REFERENCES users (id)
-);
-
-CREATE TABLE chat_messages (
-    id BIGSERIAL PRIMARY KEY,
-    room_id BIGINT NOT NULL,
-    role VARCHAR(20) NOT NULL,
-    content TEXT NOT NULL,
-    action VARCHAR(50),
-    analysis_result JSONB,
-    status VARCHAR(20) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT fk_chat_messages_room FOREIGN KEY (room_id) REFERENCES chat_rooms (id)
-);
-
-CREATE INDEX idx_chat_messages_room_created ON chat_messages (room_id, created_at);
-
 CREATE TABLE foods (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,

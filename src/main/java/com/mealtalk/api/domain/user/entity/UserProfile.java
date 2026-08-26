@@ -26,4 +26,11 @@ public class UserProfile extends BaseEntity {
         profile.goalMode = goalMode;
         return profile;
     }
+
+    public void update(BigDecimal heightCm, BigDecimal weightKg, ActivityLevel activityLevel, GoalMode goalMode) {
+        this.heightCm = heightCm;
+        this.weightKg = weightKg;
+        this.activityLevel = activityLevel;
+        this.goalMode = goalMode;
+    }
 }

@@ -23,4 +23,9 @@ public class UserTarget extends BaseEntity {
         target.dueDate = dueDate;
         return target;
     }
+
+    public void update(BigDecimal targetValue, LocalDate dueDate) {
+        this.targetValue = targetValue;
+        this.dueDate = dueDate;
+    }
 }
