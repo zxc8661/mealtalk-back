@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: "jdbc:h2:mem:mealtalk-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+mealtalk:
+  auth:
+    google-client-id: test-google-client
+    jwt-secret: test-jwt-secret-that-is-long-enough-for-hmac
+    access-token-ttl: 2h

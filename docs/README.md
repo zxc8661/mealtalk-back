@@ -15,6 +15,11 @@ Only the features documented below are delivered. There is no shared editable fo
 3. **[Meal aggregate CRUD](meal-aggregate-crud.md)**
    The meal aggregate API under `/api/v1/meals` and the daily meal journal screen. Covers aggregate-only items with full replacement, server-derived immutable item snapshots and totals, deterministic ordering, owner scoping, and the additive history-snapshot migration.
 
+## Running it locally
+
+**[Local run and test guide](local-testing.md)**
+Starts from nothing running: Postgres container, backend on the `e2e` profile, Expo web, fixture login, and the manual scenarios to walk. No Google client ID or `.env` file is needed for that path.
+
 ## Verification
 
 The following commands are recorded as passing in the execution ledger and backed by stage evidence:
