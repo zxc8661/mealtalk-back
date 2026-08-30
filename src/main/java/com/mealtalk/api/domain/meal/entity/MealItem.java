@@ -13,6 +13,7 @@ public class MealItem extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "meal_id", nullable = false) private Meal meal;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "food_id", nullable = false) private Food food;
     @Column(nullable = false, precision = 10, scale = 3) private BigDecimal amount;
+    @Column(name = "food_name", nullable = false, length = 200) private String foodName;
     @Column(nullable = false, length = 20) private String unit;
     @Column(name = "calories_kcal", nullable = false, precision = 10, scale = 3) private BigDecimal caloriesKcal;
     @Column(name = "carbohydrates_g", nullable = false, precision = 10, scale = 3) private BigDecimal carbohydratesG;
@@ -33,6 +34,7 @@ public class MealItem extends BaseEntity {
         item.meal = meal;
         item.food = food;
         item.amount = amount;
+        item.foodName = food.getName();
         item.unit = unit;
         item.caloriesKcal = caloriesKcal;
         item.carbohydratesG = carbohydratesG;
