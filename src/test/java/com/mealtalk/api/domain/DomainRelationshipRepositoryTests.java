@@ -17,6 +17,7 @@ import com.mealtalk.api.domain.user.entity.UserTarget;
 import com.mealtalk.api.domain.user.repository.UserProfileRepository;
 import com.mealtalk.api.domain.user.repository.UserRepository;
 import com.mealtalk.api.domain.user.repository.UserTargetRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -37,6 +38,7 @@ public class DomainRelationshipRepositoryTests {
     @Autowired private FoodRepository foodRepository;
     @Autowired private MealRepository mealRepository;
     @Autowired private MealItemRepository mealItemRepository;
+    @Autowired private EntityManager entityManager;
 
     @Test
     public void storesAndQueriesMvpDomainRelationships() {
@@ -48,6 +50,13 @@ public class DomainRelationshipRepositoryTests {
             "Asia/Seoul"
         ));
         user.completeProfile();
+        User otherUser = userRepository.save(User.create(
+            AuthProvider.GOOGLE,
+            "google-user-2",
+            "other@example.com",
+            "Other",
+            "UTC"
+        ));
 
         userProfileRepository.save(UserProfile.create(
             user,
@@ -64,6 +73,7 @@ public class DomainRelationshipRepositoryTests {
         ));
 
         Food chicken = foodRepository.save(Food.create(
+            user,
             "닭가슴살",
             "닭가슴살",
             BigDecimal.valueOf(100),
@@ -98,10 +108,32 @@ public class DomainRelationshipRepositoryTests {
         assertTrue(userRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, "google-user-1").isPresent());
         assertTrue(userProfileRepository.findByUserId(user.getId()).isPresent());
         assertEquals(1, userTargetRepository.findAllByUserId(user.getId()).size());
-        assertTrue(foodRepository.findByExternalSourceAndExternalFoodId("fixture", "chicken-breast").isPresent());
+        assertTrue(foodRepository.findByUserIdAndExternalSourceAndExternalFoodId(
+            user.getId(),
+            "fixture",
+            "chicken-breast"
+        ).isPresent());
+        assertTrue(foodRepository.findByIdAndUserIdAndArchivedFalse(chicken.getId(), user.getId()).isPresent());
+        assertTrue(foodRepository.findByIdAndUserIdAndArchivedFalse(chicken.getId(), otherUser.getId()).isEmpty());
+        assertEquals(1, foodRepository
+            .findAllByUserIdAndArchivedFalseAndNormalizedNameContainingOrderByNameAsc(user.getId(), "닭")
+            .size());
 
         List<Meal> meals = mealRepository.findAllByUserIdAndMealDateOrderByEatenAtAscCreatedAtAsc(user.getId(), mealDate);
         assertEquals(1, meals.size());
         assertEquals(1, mealItemRepository.findAllByMealId(meal.getId()).size());
+
+        chicken.archive();
+        foodRepository.saveAndFlush(chicken);
+        Long chickenId = chicken.getId();
+        entityManager.clear();
+
+        Food archivedChicken = foodRepository.findById(chickenId).orElseThrow();
+        assertEquals(user.getId(), archivedChicken.getUser().getId());
+        assertTrue(archivedChicken.isArchived());
+        assertTrue(foodRepository.findByIdAndUserIdAndArchivedFalse(chickenId, user.getId()).isEmpty());
+        assertTrue(foodRepository
+            .findAllByUserIdAndArchivedFalseAndNormalizedNameContainingOrderByNameAsc(user.getId(), "닭")
+            .isEmpty());
     }
 }

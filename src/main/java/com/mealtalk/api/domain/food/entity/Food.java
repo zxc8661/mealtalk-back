@@ -1,17 +1,36 @@
 package com.mealtalk.api.domain.food.entity;
 
+import com.mealtalk.api.domain.user.entity.User;
 import com.mealtalk.api.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Locale;
 
-@Getter @Entity @Table(name = "foods") @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@Entity
+@Table(
+    name = "foods",
+    indexes = @Index(
+        name = "idx_foods_user_archived_normalized_name",
+        columnList = "user_id, archived, normalized_name"
+    )
+)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Food extends BaseEntity {
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+    @Column(nullable = false) private boolean archived;
     @Column(nullable = false, length = 200) private String name;
     @Column(name = "normalized_name", nullable = false, length = 200) private String normalizedName;
     @Column(name = "serving_amount", nullable = false, precision = 10, scale = 3) private BigDecimal servingAmount;
@@ -25,6 +44,7 @@ public class Food extends BaseEntity {
     @Column(name = "last_fetched_at") private LocalDate lastFetchedAt;
 
     public static Food create(
+        User user,
         String name,
         String normalizedName,
         BigDecimal servingAmount,
@@ -38,6 +58,8 @@ public class Food extends BaseEntity {
         LocalDate lastFetchedAt
     ) {
         Food food = new Food();
+        food.user = user;
+        food.archived = false;
         food.name = name;
         food.normalizedName = normalizedName;
         food.servingAmount = servingAmount;
@@ -50,5 +72,28 @@ public class Food extends BaseEntity {
         food.externalFoodId = externalFoodId;
         food.lastFetchedAt = lastFetchedAt;
         return food;
+    }
+
+    public void update(
+        String name,
+        BigDecimal servingAmount,
+        String servingUnit,
+        BigDecimal caloriesKcal,
+        BigDecimal carbohydratesG,
+        BigDecimal proteinG,
+        BigDecimal fatG
+    ) {
+        this.name = name;
+        this.normalizedName = name.toLowerCase(Locale.ROOT);
+        this.servingAmount = servingAmount;
+        this.servingUnit = servingUnit;
+        this.caloriesKcal = caloriesKcal;
+        this.carbohydratesG = carbohydratesG;
+        this.proteinG = proteinG;
+        this.fatG = fatG;
+    }
+
+    public void archive() {
+        archived = true;
     }
 }
