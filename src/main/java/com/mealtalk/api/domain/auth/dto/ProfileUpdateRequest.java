@@ -5,7 +5,6 @@ import com.mealtalk.api.domain.user.entity.GoalMode;
 import com.mealtalk.api.domain.user.entity.TargetType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -18,7 +17,7 @@ public record ProfileUpdateRequest(
     @NotNull @Positive BigDecimal weightKg,
     @NotNull ActivityLevel activityLevel,
     @NotNull GoalMode goalMode,
-    @NotEmpty List<@Valid TargetRequest> targets
+    @NotNull List<@Valid TargetRequest> targets
 ) {
     public record TargetRequest(
         @NotNull TargetType targetType,
