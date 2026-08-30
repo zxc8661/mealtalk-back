@@ -26,4 +26,11 @@ public class Meal extends BaseEntity {
         meal.sourceText = sourceText;
         return meal;
     }
+
+    public void update(LocalDate mealDate, MealType mealType, Instant eatenAt, String sourceText) {
+        this.mealDate = mealDate;
+        this.mealType = mealType;
+        this.eatenAt = eatenAt;
+        this.sourceText = sourceText;
+    }
 }
