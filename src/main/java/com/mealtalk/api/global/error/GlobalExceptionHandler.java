@@ -1,5 +1,9 @@
 package com.mealtalk.api.global.error;
 
+import com.mealtalk.api.domain.meal.controller.MealController;
+import com.mealtalk.api.domain.meal.photo.MealPhotoStorageException;
+import com.mealtalk.api.domain.meal.photo.MealPhotoValidationException;
+import com.mealtalk.api.domain.meal.service.MealService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -10,11 +14,15 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -72,6 +80,111 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    /**
+     * A required multipart part was omitted, such as the {@code meal} JSON part.
+     *
+     * <p>Without this the missing part reaches the catch-all and a plainly bad
+     * request is reported as a server fault.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException exception) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(
+            "필수 값이 빠졌습니다.",
+            ErrorCode.VALIDATION_FAILED,
+            List.of(new ErrorResponse.FieldError(exception.getRequestPartName(), "필수 항목입니다."))
+        ));
+    }
+
+    /**
+     * The upload exceeded the container's multipart limit.
+     *
+     * <p>Reported before a byte of it is buffered, which is the point: the server
+     * must be able to refuse an oversized body without holding it in memory.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException exception) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(ErrorResponse.of("사진 용량이 너무 큽니다.", ErrorCode.PAYLOAD_TOO_LARGE));
+    }
+
+    /** A malformed multipart body: unparseable boundaries, truncated stream. */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipart(MultipartException exception) {
+        return ResponseEntity.badRequest()
+            .body(ErrorResponse.of("요청 형식이 올바르지 않습니다.", ErrorCode.MALFORMED_REQUEST));
+    }
+
+    /** A write sent as JSON rather than multipart. */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedRequestType(HttpMediaTypeNotSupportedException exception) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            .body(ErrorResponse.of("지원하지 않는 요청 형식입니다.", ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    /**
+     * The uploaded bytes are not an acceptable photo.
+     *
+     * <p>The reason decides the status, because these are genuinely different
+     * failures to a client: a broken file is worth retrying with another file,
+     * an unsupported format is not, and an oversized one needs resizing first.
+     */
+    @ExceptionHandler(MealPhotoValidationException.class)
+    public ResponseEntity<ErrorResponse> handlePhotoValidation(MealPhotoValidationException exception) {
+        log.debug("사진 검증 거부 {}: {}", exception.getReason(), exception.getMessage());
+        return switch (exception.getReason()) {
+            case EMPTY, UNREADABLE -> ResponseEntity.badRequest().body(ErrorResponse.of(
+                "사진을 읽을 수 없습니다. 다른 사진을 선택해주세요.",
+                ErrorCode.VALIDATION_FAILED,
+                List.of(new ErrorResponse.FieldError("photo", "사진 파일이 올바르지 않습니다."))
+            ));
+            case UNSUPPORTED_FORMAT, ANIMATED -> ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ErrorResponse.of(
+                    "JPEG 또는 PNG 사진만 올릴 수 있습니다.",
+                    ErrorCode.UNSUPPORTED_MEDIA_TYPE,
+                    List.of(new ErrorResponse.FieldError("photo", "지원하지 않는 사진 형식입니다."))
+                ));
+            case TOO_LARGE, TOO_MANY_PIXELS -> ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of(
+                    "사진 용량이 너무 큽니다.",
+                    ErrorCode.PAYLOAD_TOO_LARGE,
+                    List.of(new ErrorResponse.FieldError("photo", "사진이 허용 범위를 넘었습니다."))
+                ));
+        };
+    }
+
+    /**
+     * Private photo storage was unreachable or is not configured yet.
+     *
+     * <p>503 rather than 500: the request itself was fine and retrying it later
+     * can succeed. The message never mentions the bucket, endpoint or any key.
+     */
+    @ExceptionHandler(MealPhotoStorageException.class)
+    public ResponseEntity<ErrorResponse> handlePhotoStorage(MealPhotoStorageException exception) {
+        log.error("사진 저장소 오류", exception);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ErrorResponse.of("사진 저장소를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.", ErrorCode.STORAGE_UNAVAILABLE));
+    }
+
+    /** The record would end up with neither a memo nor a photo. */
+    @ExceptionHandler(MealService.EmptyMealRecordException.class)
+    public ResponseEntity<ErrorResponse> handleEmptyRecord(MealService.EmptyMealRecordException exception) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(
+            "입력값을 다시 확인해주세요.",
+            ErrorCode.VALIDATION_FAILED,
+            List.of(new ErrorResponse.FieldError("memo", "사진이나 메모 중 하나는 입력해주세요."))
+        ));
+    }
+
+    /** The photo action contradicts the parts that were sent with it. */
+    @ExceptionHandler(MealController.InvalidPhotoActionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPhotoAction(MealController.InvalidPhotoActionException exception) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(
+            "입력값을 다시 확인해주세요.",
+            ErrorCode.VALIDATION_FAILED,
+            List.of(new ErrorResponse.FieldError(exception.getField(), exception.getMessage()))
+        ));
+    }
+
     /** A required query parameter was omitted. */
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException exception) {
@@ -95,6 +208,8 @@ public class GlobalExceptionHandler {
         HttpStatus resolved = status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status;
         if (resolved.is5xxServerError()) {
             log.error("서버 오류 응답: {}", exception.getReason(), exception);
+        } else if (resolved == HttpStatus.UNAUTHORIZED) {
+            log.warn("인증 거부 응답: {}", exception.getReason());
         } else {
             log.debug("클라이언트 오류 응답 {}: {}", resolved.value(), exception.getReason());
         }
@@ -145,6 +260,9 @@ public class GlobalExceptionHandler {
             case NOT_FOUND -> "요청한 정보를 찾을 수 없습니다.";
             case CONFLICT -> "이미 처리된 요청입니다.";
             case BAD_REQUEST -> "입력값을 다시 확인해주세요.";
+            case PAYLOAD_TOO_LARGE -> "사진 용량이 너무 큽니다.";
+            case UNSUPPORTED_MEDIA_TYPE -> "지원하지 않는 요청 형식입니다.";
+            case SERVICE_UNAVAILABLE -> "사진 저장소를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.";
             default -> "서버에서 문제가 발생했습니다.";
         };
     }
@@ -156,6 +274,9 @@ public class GlobalExceptionHandler {
             case NOT_FOUND -> ErrorCode.NOT_FOUND;
             case CONFLICT -> ErrorCode.CONFLICT;
             case BAD_REQUEST -> ErrorCode.VALIDATION_FAILED;
+            case PAYLOAD_TOO_LARGE -> ErrorCode.PAYLOAD_TOO_LARGE;
+            case UNSUPPORTED_MEDIA_TYPE -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+            case SERVICE_UNAVAILABLE -> ErrorCode.STORAGE_UNAVAILABLE;
             default -> status.is4xxClientError() ? ErrorCode.MALFORMED_REQUEST : ErrorCode.INTERNAL_ERROR;
         };
     }

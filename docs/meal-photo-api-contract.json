@@ -1,0 +1,244 @@
+{
+  "$comment": "Authoritative request/response contract for the multipart meal-photo lifecycle. Written by backend todo 3 and consumed by the Expo client (todo 4). Every shape here was verified against a running server on port 8099 with the e2e fixture profile; the captured traffic is in .omo/evidence/task-3-photo-meal-journal.json.",
+  "version": "1.0.0",
+  "baseUrl": "/api/v1",
+  "authentication": {
+    "scheme": "Bearer",
+    "header": "Authorization",
+    "value": "Bearer <accessToken>",
+    "notes": "Every meal endpoint including the photo byte stream requires the header. There is no cookie, query token or signed URL: an unauthenticated photo read is 401, never bytes."
+  },
+
+  "endpoints": {
+    "listMeals": {
+      "method": "GET",
+      "path": "/api/v1/meals",
+      "query": { "date": { "type": "string", "format": "YYYY-MM-DD", "required": true } },
+      "responses": { "200": "MealListResponse", "400": "ErrorResponse", "401": "ErrorResponse" }
+    },
+    "getMeal": {
+      "method": "GET",
+      "path": "/api/v1/meals/{mealId}",
+      "responses": { "200": "MealResponse", "401": "ErrorResponse", "404": "ErrorResponse" }
+    },
+    "createMeal": {
+      "method": "POST",
+      "path": "/api/v1/meals",
+      "requestContentType": "multipart/form-data",
+      "parts": {
+        "meal": {
+          "required": true,
+          "contentType": "application/json",
+          "schema": "MealRequest",
+          "notes": "photoAction MUST be omitted on create; sending it is 400. A new record has no photo to act on."
+        },
+        "photo": {
+          "required": false,
+          "contentType": "image/jpeg or image/png",
+          "notes": "Bytes are decoded server-side; the declared content type and filename are not trusted. Omit the part entirely for a memo-only record. Do NOT send an empty part to mean 'no photo' - an empty part is rejected as an unreadable image."
+        }
+      },
+      "responses": {
+        "201": "MealResponse",
+        "400": "ErrorResponse (validation: empty record, bad JSON, missing meal part, unreadable/empty photo, malformed clientRequestId, photoAction present)",
+        "401": "ErrorResponse",
+        "409": "ErrorResponse (clientRequestId reused with a different payload)",
+        "413": "ErrorResponse (photo above 10 MiB or above 40 megapixels)",
+        "415": "ErrorResponse (photo is not JPEG/PNG, or is animated)",
+        "503": "ErrorResponse (private photo storage unavailable)"
+      }
+    },
+    "updateMeal": {
+      "method": "PUT",
+      "path": "/api/v1/meals/{mealId}",
+      "requestContentType": "multipart/form-data",
+      "parts": {
+        "meal": {
+          "required": true,
+          "contentType": "application/json",
+          "schema": "MealRequest",
+          "notes": "photoAction is REQUIRED on update."
+        },
+        "photo": {
+          "required": "only when photoAction is REPLACE",
+          "contentType": "image/jpeg or image/png"
+        }
+      },
+      "partCombinationRules": [
+        { "photoAction": "KEEP", "photoPart": "must be absent", "otherwise": "400" },
+        { "photoAction": "REMOVE", "photoPart": "must be absent", "otherwise": "400" },
+        { "photoAction": "REPLACE", "photoPart": "must be present", "otherwise": "400" },
+        { "photoAction": "missing", "result": "400" }
+      ],
+      "responses": {
+        "200": "MealResponse",
+        "400": "ErrorResponse",
+        "401": "ErrorResponse",
+        "404": "ErrorResponse (absent or not the caller's record)",
+        "413": "ErrorResponse",
+        "415": "ErrorResponse",
+        "503": "ErrorResponse"
+      }
+    },
+    "deleteMeal": {
+      "method": "DELETE",
+      "path": "/api/v1/meals/{mealId}",
+      "responses": { "204": "empty body", "401": "ErrorResponse", "404": "ErrorResponse" }
+    },
+    "getMealPhoto": {
+      "method": "GET",
+      "path": "/api/v1/meals/{mealId}/photo",
+      "query": { "revision": { "type": "integer", "required": true, "notes": "The photo id from MealPhotoResponse.id. Use MealPhotoResponse.url verbatim rather than building this yourself." } },
+      "responses": {
+        "200": {
+          "contentType": "image/jpeg",
+          "headers": { "Cache-Control": "no-store, private", "Pragma": "no-cache" },
+          "body": "raw sanitized JPEG bytes (starts FF D8 FF)"
+        },
+        "401": "ErrorResponse",
+        "404": {
+          "body": "EMPTY - zero bytes, no JSON envelope",
+          "notes": "Deliberately identical for all of: the record has no photo, the revision is stale, the record belongs to another user, the record was deleted. Byte-for-byte identical, verified by diff. Treat 404 only as 'show the placeholder'; never infer existence from it."
+        }
+      },
+      "clientNotes": "This is a binary response. Do not parse it as JSON. Attach the Authorization header; a plain <Image src> without the header will get 401."
+    }
+  },
+
+  "schemas": {
+    "MealRequest": {
+      "$comment": "The `meal` JSON part. Sent as a part with Content-Type application/json.",
+      "type": "object",
+      "properties": {
+        "mealDate": { "type": "string", "format": "YYYY-MM-DD", "required": true },
+        "mealType": { "type": "string", "enum": ["BREAKFAST", "LUNCH", "DINNER", "SNACK", "UNSPECIFIED"], "required": true },
+        "eatenAt": { "type": ["string", "null"], "format": "ISO-8601 instant, e.g. 2026-08-29T12:30:00Z", "required": false },
+        "memo": {
+          "type": ["string", "null"],
+          "required": false,
+          "maxLength": 1000,
+          "notes": "Trimmed server-side; a whitespace-only memo counts as absent. The 1000 character limit applies after trimming. Inner newlines, emoji and Korean text are preserved verbatim."
+        },
+        "photoAction": {
+          "type": ["string", "null"],
+          "enum": ["KEEP", "REMOVE", "REPLACE"],
+          "required": "on update only",
+          "notes": "Omit on create."
+        },
+        "clientRequestId": {
+          "type": ["string", "null"],
+          "format": "UUID",
+          "required": false,
+          "location": "a field of the `meal` JSON part (NOT an HTTP header)",
+          "notes": "Optional but recommended on create. Generate one UUID per draft and reuse it for every retry of that draft. Regenerate only when the user edits the draft."
+        }
+      },
+      "recordInvariant": "memo != null || the resulting record has a photo. Evaluated on the POST-UPDATE state: REMOVE on a record whose memo is empty is 400. Violations return 400 VALIDATION_FAILED with details[].field == \"memo\"."
+    },
+
+    "MealResponse": {
+      "type": "object",
+      "$comment": "Fields whose value is null are OMITTED entirely (Jackson NON_NULL), so check for key presence, not for null.",
+      "properties": {
+        "id": { "type": "integer" },
+        "mealDate": { "type": "string", "format": "YYYY-MM-DD" },
+        "mealType": { "type": "string", "enum": ["BREAKFAST", "LUNCH", "DINNER", "SNACK", "UNSPECIFIED"] },
+        "eatenAt": { "type": "string", "format": "ISO-8601 instant", "omittedWhenNull": true },
+        "memo": { "type": "string", "omittedWhenNull": true },
+        "photo": { "$ref": "MealPhotoResponse", "omittedWhenNull": true }
+      },
+      "absentFields": "No calorie, macro, item or nutrition field is ever returned. No objectKey, bucket, endpoint, signed URL or credential is ever returned."
+    },
+
+    "MealPhotoResponse": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "notes": "Also the revision. Changes on every REPLACE; the previous value then 404s." },
+        "width": { "type": "integer", "notes": "Pixels of the stored image. Longest edge capped at 2048." },
+        "height": { "type": "integer" },
+        "byteSize": { "type": "integer", "notes": "Bytes of the stored JPEG, not of the client's original upload." },
+        "contentType": { "type": "string", "const": "image/jpeg", "notes": "Always JPEG: a PNG upload is re-encoded." },
+        "checksumSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "notes": "SHA-256 of the stored bytes. Safe to use as a cache key." },
+        "url": {
+          "type": "string",
+          "example": "/api/v1/meals/1/photo?revision=1",
+          "notes": "Relative authenticated API path. Prefix with the API base URL and send the Authorization header. This is NOT a public or signed URL and it will not load without the token."
+        }
+      }
+    },
+
+    "MealListResponse": {
+      "type": "object",
+      "properties": {
+        "mealDate": { "type": "string", "format": "YYYY-MM-DD" },
+        "meals": { "type": "array", "items": { "$ref": "MealResponse" } }
+      },
+      "ordering": "Records with an eatenAt come first ordered by eatenAt ascending, then records without one, ties broken by id ascending.",
+      "absentFields": "No day total of any kind."
+    },
+
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "notes": "Korean, user-displayable." },
+        "code": { "type": "string", "enum": ["VALIDATION_FAILED", "MALFORMED_REQUEST", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "CONFLICT", "PAYLOAD_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "STORAGE_UNAVAILABLE", "INTERNAL_ERROR"] },
+        "details": {
+          "type": "array",
+          "omittedWhenEmpty": true,
+          "items": { "type": "object", "properties": { "field": { "type": "string" }, "message": { "type": "string" } } }
+        }
+      }
+    }
+  },
+
+  "errorEnvelopes": [
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "empty record (neither memo nor photo)", "body": { "message": "입력값을 다시 확인해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "memo", "message": "사진이나 메모 중 하나는 입력해주세요." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "KEEP or REMOVE sent with a photo part", "body": { "message": "입력값을 다시 확인해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "photo", "message": "사진을 교체할 때만 사진을 보낼 수 있습니다." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "REPLACE sent without a photo part", "body": { "message": "입력값을 다시 확인해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "photo", "message": "사진을 교체하려면 새 사진을 함께 보내주세요." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "photoAction missing on update", "body": { "message": "입력값을 다시 확인해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "photoAction", "message": "사진 처리 방식(KEEP, REMOVE, REPLACE)을 지정해주세요." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "the meal part is missing", "body": { "message": "필수 값이 빠졌습니다.", "code": "VALIDATION_FAILED", "details": [{ "field": "meal", "message": "필수 항목입니다." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "the photo is unreadable, corrupt, SVG or zero bytes", "body": { "message": "사진을 읽을 수 없습니다. 다른 사진을 선택해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "photo", "message": "사진 파일이 올바르지 않습니다." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "clientRequestId is not a UUID", "body": { "message": "입력값을 다시 확인해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "clientRequestId", "message": "요청 식별자는 UUID 형식이어야 합니다." }] } },
+    { "status": 400, "code": "VALIDATION_FAILED", "when": "memo longer than 1000 characters after trimming", "body": { "message": "입력값을 다시 확인해주세요.", "code": "VALIDATION_FAILED", "details": [{ "field": "memo", "message": "메모는 1000자까지 입력할 수 있습니다." }] } },
+    { "status": 400, "code": "MALFORMED_REQUEST", "when": "the meal part is not valid JSON, or the parts were swapped", "body": { "message": "요청 형식이 올바르지 않습니다.", "code": "MALFORMED_REQUEST" } },
+    { "status": 401, "code": "UNAUTHORIZED", "when": "no or invalid bearer token, on any endpoint including the photo stream", "body": { "message": "로그인이 필요합니다.", "code": "UNAUTHORIZED" } },
+    { "status": 404, "code": "NOT_FOUND", "when": "the meal is absent or belongs to another user (JSON endpoints)", "body": { "message": "요청한 정보를 찾을 수 없습니다.", "code": "NOT_FOUND" } },
+    { "status": 404, "code": null, "when": "GET photo: absent / stale revision / foreign owner / deleted meal", "body": "", "notes": "Empty body, no envelope. All four cases are byte-identical by design." },
+    { "status": 409, "code": "CONFLICT", "when": "clientRequestId reused with a different payload", "body": { "message": "이미 처리된 요청입니다.", "code": "CONFLICT" } },
+    { "status": 413, "code": "PAYLOAD_TOO_LARGE", "when": "the upload exceeds the 10 MiB multipart limit, or the image exceeds 40 megapixels", "body": { "message": "사진 용량이 너무 큽니다.", "code": "PAYLOAD_TOO_LARGE" } },
+    { "status": 415, "code": "UNSUPPORTED_MEDIA_TYPE", "when": "the photo decoded as something other than a still JPEG/PNG (e.g. animated GIF/APNG)", "body": { "message": "JPEG 또는 PNG 사진만 올릴 수 있습니다.", "code": "UNSUPPORTED_MEDIA_TYPE", "details": [{ "field": "photo", "message": "지원하지 않는 사진 형식입니다." }] } },
+    { "status": 503, "code": "STORAGE_UNAVAILABLE", "when": "private photo storage is unreachable or not configured yet", "body": { "message": "사진 저장소를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.", "code": "STORAGE_UNAVAILABLE" }, "notes": "Retryable. No record is created; a memo-only write still succeeds during the outage." }
+  ],
+
+  "idempotency": {
+    "mechanism": "client-supplied UUID",
+    "location": "the `clientRequestId` field of the `meal` JSON part",
+    "scope": "per user - two users may use the same UUID without colliding",
+    "appliesTo": "createMeal only",
+    "sameIdSamePayload": "201 with the ORIGINAL record (same meal id, same photo id). No duplicate row and no second stored object.",
+    "sameIdDifferentPayload": "409 CONFLICT",
+    "fingerprint": "SHA-256 over mealDate, mealType, eatenAt and the normalized memo. Photo bytes are NOT part of it, so retrying with a re-encoded copy of the same image still replays rather than conflicts.",
+    "lifetime": "The mapping is deleted with its meal, so the same UUID may be reused after the record is deleted."
+  },
+
+  "photoLimits": {
+    "maxUploadBytes": 10485760,
+    "maxUploadBytesHuman": "10 MiB",
+    "maxPixels": 40000000,
+    "maxStoredEdgePixels": 2048,
+    "acceptedInputFormats": ["JPEG", "PNG"],
+    "storedOutputFormat": "JPEG",
+    "notes": "EXIF and GPS metadata are stripped by re-encoding; EXIF orientation is baked into the pixels. Client-side downscaling before upload is recommended but not required."
+  },
+
+  "clientChecklist": [
+    "Build the body with FormData and let the HTTP client set the multipart boundary; never set Content-Type manually on the whole request.",
+    "Name the parts exactly `meal` and `photo`.",
+    "Give the `meal` part Content-Type application/json.",
+    "Omit photoAction on create; always send it on update.",
+    "Never send an empty `photo` part to mean 'no photo' - omit the part.",
+    "Render photos from MealPhotoResponse.url with the Authorization header; never cache or expose it as a public URL.",
+    "Treat a 404 from the photo endpoint as 'show a placeholder', with no inference about existence.",
+    "Keep one clientRequestId per unsaved draft across retries."
+  ]
+}

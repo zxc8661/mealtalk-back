@@ -8,7 +8,7 @@
 
 ## 1. 사전에 입력해야 할 값
 
-**결론: 없습니다.** `.env` 파일을 만들지 않아도 됩니다.
+**일반 CRUD 테스트에는 없습니다.** 공공 식품 검색까지 테스트할 때만 `.env` 파일을 만듭니다.
 
 `src/main/resources/application.yml`이 모든 값에 개발용 기본값을 갖고 있습니다.
 
@@ -20,9 +20,33 @@
 | `JWT_SECRET` | 개발용 기본값 | 그대로 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:8081` | 그대로 |
 | `GOOGLE_CLIENT_ID` | (비어 있음) | **e2e 프로파일에서는 불필요** |
-| `FOOD_API_KEY` | — | 소스에서 미사용. 무시 |
+| `FOOD_API_KEY` | — | 공공 식품 검색을 사용할 때만 공공데이터포털 인증키 입력 |
 
 앱 쪽 `mealtalk-app/.env`도 `.env.example`을 그대로 복사하면 됩니다. 기본값이 `http://localhost:8080`이라 수정할 게 없습니다.
+
+### 공공 식품 검색용 키
+
+`mealtalk-back/.env.example`을 `mealtalk-back/.env`로 복사하고 아래처럼 입력합니다.
+`.env`는 Git에서 제외되며 Spring Boot가 직접 읽습니다.
+
+```env
+spring.profiles.active=e2e
+FOOD_API_KEY=공공데이터포털_일반_인증키
+```
+
+키는 공공데이터포털의 **식품의약품안전처_식품영양성분DB정보**에서 발급받은 일반 인증키를
+그대로 붙여넣으면 됩니다. 포털이 주는 키는 이미 percent-encoding 되어 있으며, 백엔드가
+전송 전에 한 번 디코딩하므로 따로 변환할 필요가 없습니다.
+
+실제 호출 대상은 아래 오퍼레이션입니다.
+
+```text
+https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02
+```
+
+`FOOD_API_KEY`는 Expo 앱 `.env`나 `EXPO_PUBLIC_*`에 넣으면 안 됩니다. 백엔드만
+이 API를 호출합니다. 키가 비어 있으면 공공 검색만 오류가 나며, 기존 내 식품 검색과
+식사 기록은 계속 사용할 수 있습니다.
 
 ### 구글 로그인 키는 왜 필요 없나
 
@@ -64,16 +88,13 @@ PowerShell (`mealtalk-back` 디렉터리에서):
 
 ```powershell
 cd mealtalk-back
-$env:SPRING_PROFILES_ACTIVE="e2e"
 .\gradlew.bat bootRun
 ```
-
-환경변수는 그 창에서 유지되므로, 다음부터 같은 창에서는 `.\gradlew.bat bootRun`만 입력하면 됩니다.
 
 Git Bash나 macOS/Linux라면:
 
 ```bash
-cd mealtalk-back && SPRING_PROFILES_ACTIVE=e2e ./gradlew bootRun
+cd mealtalk-back && ./gradlew bootRun
 ```
 
 성공 신호 — 최초 실행이면 Flyway가 마이그레이션 3개를 적용합니다.
@@ -165,12 +186,14 @@ done
 
 ### B. 식품
 
-1. 새 식품 추가 → 목록 반영 → 새로고침 유지.
-2. 검색어로 일부만 필터링되는지.
-3. 수정 후 목록에 반영되는지.
-4. **`archive target`을 보관 → 목록에서 사라짐 → 새로고침해도 안 보임.**
+1. `FOOD_API_KEY`를 설정했다면 식단 추가 화면에서 `닭가슴살`을 검색 → **공공 식품** 결과 선택 →
+   내 식품으로 저장되고 선택한 식품 목록에 추가되는지.
+2. 새 식품 추가 → 목록 반영 → 새로고침 유지.
+3. 검색어로 일부만 필터링되는지.
+4. 수정 후 목록에 반영되는지.
+5. **`archive target`을 보관 → 목록에서 사라짐 → 새로고침해도 안 보임.**
    보관은 삭제가 아니므로 과거 식사 기록에는 그대로 남아 있어야 합니다.
-5. 제공량에 `0` 또는 소수점 넷째 자리(`1.2345`) 입력 시 저장이 막히는지.
+6. 제공량에 `0` 또는 소수점 넷째 자리(`1.2345`) 입력 시 저장이 막히는지.
 
 ### C. 식사
 

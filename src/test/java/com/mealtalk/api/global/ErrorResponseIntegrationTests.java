@@ -11,13 +11,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -67,10 +71,9 @@ public class ErrorResponseIntegrationTests {
     public void bodyValidationFailureReportsOffendingFields() throws Exception {
         String token = signIn();
 
-        mockMvc.perform(post("/api/v1/meals")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"mealDate\":\"2026-03-14\",\"mealType\":\"LUNCH\",\"eatenAt\":null,\"items\":[]}"))
+        mockMvc.perform(multipart("/api/v1/meals")
+                .file(mealPart("{\"mealDate\":\"2026-03-14\",\"mealType\":null,\"eatenAt\":null,\"memo\":\"메모\"}"))
+                .header("Authorization", "Bearer " + token))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message", not(blankOrNullString())))
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
@@ -103,12 +106,17 @@ public class ErrorResponseIntegrationTests {
     public void unreadableJsonBodyIsReported() throws Exception {
         String token = signIn();
 
-        mockMvc.perform(post("/api/v1/meals")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{ this is not json }"))
+        mockMvc.perform(multipart("/api/v1/meals")
+                .file(mealPart("{ this is not json }"))
+                .header("Authorization", "Bearer " + token))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    }
+
+    private static MockMultipartFile mealPart(String json) {
+        return new MockMultipartFile(
+            "meal", "meal.json", MediaType.APPLICATION_JSON_VALUE, json.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     @Test

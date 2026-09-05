@@ -28,7 +28,7 @@ class MealHistorySnapshotMigrationTests {
             migrationResource("/db/migration-h2/V3__add_meal_item_food_name_snapshot.sql")
         );
 
-        MigrateResult result = flyway(url).migrate();
+        MigrateResult result = v3Flyway(url).migrate();
 
         assertEquals(3, result.migrationsExecuted);
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
@@ -52,7 +52,7 @@ class MealHistorySnapshotMigrationTests {
             seedV2MealItem(connection);
         }
 
-        MigrateResult v3 = flyway(url).migrate();
+        MigrateResult v3 = v3Flyway(url).migrate();
         assertEquals(1, v3.migrationsExecuted);
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
@@ -71,12 +71,17 @@ class MealHistorySnapshotMigrationTests {
         }
     }
 
-    private static Flyway flyway(String url) {
+    /**
+     * Stops at V3 on purpose: this suite is about the food-name snapshot contract
+     * V3 introduced, so it must not restate how many migrations exist in total.
+     */
+    private static Flyway v3Flyway(String url) {
         return Flyway.configure()
             .dataSource(url, "sa", "")
             .locations("classpath:db/migration-h2")
             .baselineOnMigrate(true)
             .baselineVersion("1")
+            .target(MigrationVersion.fromVersion("3"))
             .load();
     }
 

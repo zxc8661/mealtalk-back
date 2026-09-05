@@ -9,6 +9,13 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.time.LocalDate;
 
+/**
+ * One journal record: when it was eaten, which meal it was, and what the user
+ * wrote about it. The photo lives in {@link MealPhoto}, one per meal at most.
+ *
+ * <p>The column stays {@code source_text} from V1; V4 redefined its meaning as
+ * the user-authored memo and backfilled the historic item-only rows.
+ */
 @Getter @Entity @Table(name = "meals", indexes = @Index(name = "idx_meals_user_date_eaten", columnList = "user_id, meal_date, eaten_at")) @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Meal extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false) private User user;
@@ -32,5 +39,10 @@ public class Meal extends BaseEntity {
         this.mealType = mealType;
         this.eatenAt = eatenAt;
         this.sourceText = sourceText;
+    }
+
+    /** The user-authored memo. Null only when the record is carried by its photo. */
+    public String getMemo() {
+        return sourceText;
     }
 }

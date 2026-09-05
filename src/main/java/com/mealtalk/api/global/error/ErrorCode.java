@@ -14,6 +14,12 @@ public enum ErrorCode {
     NOT_FOUND,
     /** The request conflicts with current server state. */
     CONFLICT,
+    /** The upload is larger than the server accepts. */
+    PAYLOAD_TOO_LARGE,
+    /** The uploaded bytes are of a type the server refuses to store. */
+    UNSUPPORTED_MEDIA_TYPE,
+    /** Private photo storage is unreachable or not configured. The request may be retried. */
+    STORAGE_UNAVAILABLE,
     /** Anything unhandled. The cause is logged, never returned. */
     INTERNAL_ERROR
 }
