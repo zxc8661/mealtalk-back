@@ -1,14 +1,19 @@
 package com.mealtalk.api.domain.food.controller;
 
 import com.mealtalk.api.domain.auth.security.AuthenticatedUser;
+import com.mealtalk.api.domain.food.catalog.FoodCatalogResponse;
+import com.mealtalk.api.domain.food.catalog.FoodCatalogService;
 import com.mealtalk.api.domain.food.dto.FoodRequest;
 import com.mealtalk.api.domain.food.dto.FoodResponse;
 import com.mealtalk.api.domain.food.service.FoodService;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,9 +28,11 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Validated
 @RequestMapping("/api/v1/foods")
 public class FoodController {
     private final FoodService foodService;
+    private final FoodCatalogService foodCatalogService;
 
     @GetMapping
     public List<FoodResponse> list(
@@ -33,6 +40,14 @@ public class FoodController {
         @RequestParam(required = false) String query
     ) {
         return foodService.list(user.userId(), query);
+    }
+
+    @GetMapping("/catalog")
+    public List<FoodCatalogResponse> catalog(
+        @AuthenticationPrincipal AuthenticatedUser user,
+        @RequestParam @NotBlank @Size(max = 100) String query
+    ) {
+        return foodCatalogService.search(query.trim());
     }
 
     @GetMapping("/{foodId}")

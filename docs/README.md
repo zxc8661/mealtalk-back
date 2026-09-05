@@ -2,7 +2,7 @@
 
 This is the canonical index for the MealTalk backend. It links the stage documents in the order the features were built and shipped: profile, then private food, then meal. Each stage document is the authoritative record for its own shipped contract, application flow, migrations, and verification evidence.
 
-Only the features documented below are delivered. There is no shared editable food catalog, no admin or role system, no password accounts, no barcode or AI capture, no external food imports, no generic unit conversion, and no standalone meal-item endpoint. Meal items exist only inside the meal aggregate.
+Only the features documented below are delivered. There is no shared editable food catalog, no admin or role system, no password accounts, no barcode or AI capture, no generic unit conversion, and no standalone meal-item endpoint. Meal items exist only inside the meal aggregate.
 
 ## Stages in execution order
 
@@ -11,6 +11,9 @@ Only the features documented below are delivered. There is no shared editable fo
 
 2. **[Private custom-food CRUD](private-food-crud.md)**
    The private per-user food API under `/api/v1/foods` and the food-management screen. Covers owner-only visibility, name search, archive-not-delete semantics with preserved history, validation of the editable fields, and the additive ownership migration.
+   The authenticated `/api/v1/foods/catalog` search endpoint additionally imports a selected
+   식품의약품안전처 식품영양성분DB result into the caller's private foods; it never creates shared
+   catalog rows.
 
 3. **[Meal aggregate CRUD](meal-aggregate-crud.md)**
    The meal aggregate API under `/api/v1/meals` and the daily meal journal screen. Covers aggregate-only items with full replacement, server-derived immutable item snapshots and totals, deterministic ordering, owner scoping, and the additive history-snapshot migration.
@@ -18,7 +21,7 @@ Only the features documented below are delivered. There is no shared editable fo
 ## Running it locally
 
 **[Local run and test guide](local-testing.md)**
-Starts from nothing running: Postgres container, backend on the `e2e` profile, Expo web, fixture login, and the manual scenarios to walk. No Google client ID or `.env` file is needed for that path.
+Starts from nothing running: Postgres container, backend on the `e2e` profile, Expo web, fixture login, public-food-catalog setup, and the manual scenarios to walk. No Google client ID is needed; `.env` is only required for public catalog search.
 
 ## Verification
 

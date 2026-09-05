@@ -2,6 +2,7 @@ package com.mealtalk.api.domain;
 
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.Test;
 
@@ -86,12 +87,18 @@ class FoodOwnershipMigrationTests {
         assertThrows(FlywayException.class, () -> flyway(url).migrate());
     }
 
+    /**
+     * Both stop at V3. This suite is about the ownership contract V2 introduced and
+     * the V3 state it has to keep working in, so it must not restate how many
+     * migrations exist in total.
+     */
     private static Flyway freshFlyway(String url) {
         return Flyway.configure()
             .dataSource(url, "sa", "")
             .locations("classpath:db/migration-h2")
             .baselineOnMigrate(true)
             .baselineVersion("1")
+            .target(MigrationVersion.fromVersion("3"))
             .load();
     }
 
@@ -101,6 +108,7 @@ class FoodOwnershipMigrationTests {
             .locations("classpath:db/migration")
             .baselineOnMigrate(true)
             .baselineVersion("1")
+            .target(MigrationVersion.fromVersion("3"))
             .load();
     }
 
