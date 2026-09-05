@@ -17,6 +17,11 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+	// Cloudflare R2 speaks the S3 API, so the standard AWS SDK v2 S3 client is used.
+	awsSdkVersion = '2.31.78'
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -27,6 +32,13 @@ dependencies {
 	implementation('com.google.api-client:google-api-client:2.7.2') {
 		exclude group: 'commons-logging', module: 'commons-logging'
 	}
+	// Private meal photo storage on Cloudflare R2 through its S3-compatible API.
+	// The Apache HTTP client is pinned as the sync transport so the SDK does not
+	// have to discover one at runtime. Image decoding uses the JDK's own ImageIO;
+	// no third-party imaging dependency is required.
+	implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:apache-client'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
